@@ -30,7 +30,7 @@ class Client:
     def __repr__(self) -> str:
         """Строковое представление объекта."""
 
-        return f"{type(self).__name__}(port={self.port}, unit={self.unit})"
+        return f"{type(self).__name__}(port={self.port!r}, unit={self.unit})"
 
     def __del__(self) -> None:
         """Закрытие соединения с устройством при удалении объекта."""
@@ -76,14 +76,24 @@ class Client:
         answer = self._bus_exchange(packet)
         _logger.debug("Recv frame = %r", list(answer))
 
+        if not answer:
+            msg = "Invalid message format"
+            raise BlsdError(msg)
+
         return answer
+
+    @staticmethod
+    def _check_value(value: int, interval: tuple[int, int]) -> None:
+        """Проверяет значение на принадлежность заданному диапазону."""
+
+        if value not in range(*interval):
+            msg = "Value out of range"
+            raise BlsdError(msg)
 
     def set_address(self, value: int) -> bool:
         """Установка нового адреса блока."""
 
-        if value not in range(255):
-            msg = "Value must be in range from 0 to 254"
-            raise BlsdError(msg)
+        self._check_value(value, (0, 255))
         return bool(self._send_massage(command=0xA0, value=value))
 
     def release_address(self) -> None:
@@ -94,49 +104,37 @@ class Client:
     def set_pulse_per_turn(self, value: int) -> bool:
         """Установка числа импульсов Холла на оборот."""
 
-        if value not in range(256):
-            msg = "Value must be in range from 0 to 255"
-            raise BlsdError(msg)
+        self._check_value(value, (0, 256))
         return bool(self._send_massage(command=0xA2, value=value))
 
     def set_speed(self, value: int) -> bool:
         """Установка скорости движения (об/сек)."""
 
-        if value not in range(251):
-            msg = "Value must be in range from 0 to 250"
-            raise BlsdError(msg)
+        self._check_value(value, (0, 251))
         return bool(self._send_massage(command=0xA3, value=value))
 
     def set_max_speed(self, value: int) -> bool:
         """Установка максимальной скорости движения (об/сек)."""
 
-        if value not in range(251):
-            msg = "Value must be in range from 0 to 250"
-            raise BlsdError(msg)
+        self._check_value(value, (0, 251))
         return bool(self._send_massage(command=0xA4, value=value))
 
     def set_acceleration(self, value: int) -> bool:
         """Установка ускорения движения."""
 
-        if value not in range(1, 25):
-            msg = "Value must be in range from 1 to 24"
-            raise BlsdError(msg)
+        self._check_value(value, (1, 25))
         return bool(self._send_massage(command=0xA5, value=value))
 
     def set_slowdown(self, value: int) -> bool:
         """Установка торможения движения."""
 
-        if value not in range(1, 25):
-            msg = "Value must be in range from 1 to 24"
-            raise BlsdError(msg)
+        self._check_value(value, (1, 25))
         return bool(self._send_massage(command=0xA6, value=value))
 
     def set_direction(self, value: int) -> bool:
         """Установка направления движения."""
 
-        if value not in range(2):
-            msg = "Value must be in range from 0 to 1"
-            raise BlsdError(msg)
+        self._check_value(value, (0, 2))
         return bool(self._send_massage(command=0xA7, value=value))
 
     def get_state(self) -> dict[str, int]:
@@ -148,8 +146,7 @@ class Client:
                 "default": state[1] >> 5 & 1,
                 "direction": state[1] >> 4 & 1,
                 "turn": ((state[1] & 0xF) << 8) + state[2],
-                "speed": state[3],
-               }
+                "speed": state[3]}
 
     def start_move(self) -> bool:
         """Запуск двигателя."""
